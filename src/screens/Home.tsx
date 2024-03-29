@@ -6,11 +6,13 @@ import {
   TextInput,
   FlatList,
 } from 'react-native';
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {getApi} from '../network/getApi';
 import CardView from '../component/CardView';
 import {Repository} from '../utils/Utils';
+import NetInfo from '@react-native-community/netinfo';
 import {useNavigation} from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Home = () => {
   const navigation: any = useNavigation();
@@ -18,6 +20,25 @@ const Home = () => {
   const [timer, setTimer] = useState<NodeJS.Timeout>();
   const [apiData, setApiData] = useState<any>([]);
   const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      if (!state.isConnected) {
+        getDataLocally();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  const getDataLocally = async () => {
+    const offlineData = await AsyncStorage.getItem('data');
+    if (offlineData) {
+      setApiData(JSON.parse(offlineData?.slice(0, 15)));
+    }
+  };
 
   const handleNavigate = (item: Repository) => {
     navigation.navigate('RepoDetails', {item: item});
@@ -53,6 +74,7 @@ const Home = () => {
     const newTimer = setTimeout(async () => {
       const response = await getApi(text, page);
       setApiData(response.data?.items);
+      await AsyncStorage.setItem('data', JSON.stringify(response.data?.items));
     }, 500);
 
     setTimer(newTimer);
